@@ -12,7 +12,7 @@ class MusicPlayer:
         pygame.mixer.init()
 
         self.window = tk.Tk()
-        self.window.title("Cute Music Player")
+        self.window.title("Music Player")
         self.window.geometry("500x500")
         self.window.config(bg="#F0E1D2")
 
