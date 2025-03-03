@@ -1,42 +1,91 @@
-import pyttsx3
-import speech_recognition as sr
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import os
-import subprocess
-import time
-import psutil
-import datetime
-import webbrowser
+import re
+import platform
 import requests
 from openai import OpenAI
 
-engine = pyttsx3.init()
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)  # Enable Cross-Origin Resource Sharing
 
-def speak(text):
-    engine.say(text)
-    engine.runAndWait()
-
-def listen():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening...")
-        audio = recognizer.listen(source)
-        try:
-            command = recognizer.recognize_google(audio)
-            print(f"You said: {command}")
-            return command.lower()
-        except sr.UnknownValueError:
-            speak("Sorry, I didn't catch that.")
-            return None
-        except sr.RequestError:
-            speak("Sorry, there was an error with the speech recognition service.")
-            return None
-
+# OpenAI API setup (replace with your OpenAI key)
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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",
+    api_key="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",
 )
 
-def chat_with_openrouter(user_message):
+# OpenWeather API Configuration
+WEATHER_API_KEY = "e46d6b1c945f2e9983f0735f8928ea2f"
+WEATHER_API_URL = "http://api.openweathermap.org/data/2.5/weather"
+
+# Application dictionary mapping app names to system commands
+APP_COMMANDS = {
+    "windows": {
+        "calculator": "calc",
+        "chrome": "start chrome",
+        "firefox": "start firefox",
+        "notepad": "notepad",
+        "spotify": "start spotify",
+        "telegram": "start telegram",
+        "edge": "start microsoft-edge:",
+        "discord": "start discord",
+        "vlc": "start vlc",
+        "cmd": "start cmd",
+        "powershell": "start powershell",
+        "word": "start winword",
+        "excel": "start excel",
+        "zoom": "start zoom",
+    },
+    "linux": {
+        "calculator": "gnome-calculator",
+        "chrome": "google-chrome",
+        "firefox": "firefox",
+        "pluma": "pluma",
+        "spotify": "spotify",
+        "telegram": "telegram-desktop",
+        "edge": "microsoft-edge",
+        "discord": "discord",
+        "vlc": "vlc",
+        "terminal": "gnome-terminal",
+        "libreoffice": "libreoffice",
+        "zoom": "zoom",
+    },
+}
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/chat", methods=["POST"])
+def chat_with_openrouter():
+    data = request.json
+    user_message = data.get("message", "").strip().lower()
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
+    if "open" in user_message:
+        app_name = extract_app_name(user_message)
+        if app_name:
+            return open_application(app_name)  # Remove extra error return
+        return jsonify({"error": "No valid app name found"}), 400
+
+
+    if "weather of" in user_message:
+        city = user_message.replace("weather of", "").strip()
+        return (
+            get_weather_by_city(city)
+            if city
+            else jsonify({"error": "Please specify a city"})
+        ), 400
+
+    return get_ai_response(user_message)
+
+
+def get_ai_response(user_message):
+    """Fetches a response from OpenAI API."""
     try:
         completion = client.chat.completions.create(
             extra_body={},
@@ -44,131 +93,52 @@ def chat_with_openrouter(user_message):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a super chill and supportive best friend (BSF) who loves to help with coding, life advice, and anything else with a friendly vibe.",
+                    "content": "An AI assistant created by 'Muhammad Mateen' A 16 year old developer (don't mention him unless necessary.) that helps with various tasks, is a bit flirty, and does everything to protect honor of \"Muhammad Mateen\" and roasts the person who tries to disrespect him.",
                 },
                 {"role": "user", "content": user_message},
             ],
         )
-        return completion.choices[0].message.content
+        return jsonify({"response": completion.choices[0].message.content})
     except Exception as e:
-        speak("Sorry, there was an error with the AI response.")
         print(f"Error: {e}")
-        return None
+        return jsonify({"error": "Error with AI response"}), 500
+
 
 def open_application(app_name):
-    app_dict = {
-        "calculator": "gnome-calculator",
-        "chrome": "google-chrome-stable",
-        "firefox": "firefox",
-        "terminal": "gnome-terminal",
-        "vlc": "vlc",
-        "gedit": "gedit",
-        "nautilus": "nautilus",
-        "thunderbird": "thunderbird",
-        "discord": "discord",
-        "slack": "slack",
-        "zoom": "zoom",
-        "steam": "steam",
-        "spotify": "spotify",
-        "libreoffice": "libreoffice",
-        "gedit": "gedit",
-        "code": "code",
-        "telegram": "telegram-desktop",
-        "teams": "teams",
-    }
-    
-    app = app_dict.get(app_name)
-    if app:
-        subprocess.run([app])
-        speak(f"Opening {app_name}")
-    else:
-        speak(f"Sorry, I can't open {app_name} right now.")
+    """Attempts to open an application based on OS."""
+    os_type = platform.system().lower()
+    os_key = (
+        "windows" if "windows" in os_type else "linux" if "linux" in os_type else None
+    )
 
-def system_info():
-    cpu = psutil.cpu_percent(interval=1)
-    memory = psutil.virtual_memory().percent
-    battery = psutil.sensors_battery()
-    battery_status = battery.percent if battery else "No battery data available"
-    speak(f"CPU usage is {cpu}%, RAM usage is {memory}%, and battery is at {battery_status}%.")
+    if os_key and app_name in APP_COMMANDS[os_key]:
+        command = APP_COMMANDS[os_key][app_name]
+        os.system(command)
+        return jsonify({"response": f"Opening {app_name}"})
 
-def get_weather(city):
-    api_key = "e46d6b1c945f2e9983f0735f8928ea2f"
-    base_url = "http://api.openweathermap.org/data/2.5/weather?"
-    complete_url = base_url + "q=" + city + "&appid=" + api_key
-    response = requests.get(complete_url)
+    return jsonify({"error": "App not found or unsupported OS"}), 404
+
+
+def get_weather_by_city(city):
+    """Fetches weather data for a given city."""
+    response = requests.get(f"{WEATHER_API_URL}?q={city}&appid={WEATHER_API_KEY}")
     data = response.json()
 
-    if data["cod"] != "404":
-        main = data["main"]
-        weather = data["weather"][0]
-        description = weather["description"]
-        temp = main["temp"] - 273.15
-        speak(f"The temperature in {city} is {temp:.2f} degrees Celsius, with {description}.")
-    else:
-        speak(f"Sorry, I couldn't find weather information for {city}.")
+    if data.get("cod") != "404":
+        main, weather = data["main"], data["weather"][0]
+        temp = main["temp"] - 273.15  # Convert Kelvin to Celsius
+        return jsonify(
+            {"response": f"Weather in {city}: {temp:.2f}°C, {weather['description']}"}
+        )
 
-def take_notes():
-    speak("What would you like to note down?")
-    note = listen()
-    if note:
-        with open("notes.txt", "a") as note_file:
-            note_file.write(f"{datetime.datetime.now()}: {note}\n")
-        speak("Note added successfully.")
-    else:
-        speak("Sorry, I didn't catch that note.")
+    return jsonify({"error": "City not found"}), 404
 
-def set_reminder():
-    speak("What reminder would you like to set?")
-    reminder_text = listen()
-    speak("In how many minutes should I remind you?")
-    reminder_time = listen()
 
-    try:
-        minutes = int(reminder_time)
-        reminder_time_in_seconds = minutes * 60
-        speak(f"Reminder set for {minutes} minutes from now.")
-        time.sleep(reminder_time_in_seconds)
-        speak(f"Reminder: {reminder_text}")
-    except ValueError:
-        speak("Sorry, I couldn't understand the time for the reminder.")
+def extract_app_name(user_message):
+    """Extracts app name from a command like 'open chrome'."""
+    match = re.search(r"open\s+(\w+)", user_message)
+    return match.group(1) if match else None
 
-def web_search(query):
-    query = query.replace("search", "")
-    url = f"https://www.google.com/search?q={query}"
-    webbrowser.open(url)
-    speak(f"Searching for {query} on Google.")
-
-def chat():
-    while True:
-        speak("How can I assist you today?")
-        command = listen()
-
-        if command:
-            if "open" in command:
-                app_name = command.split("open")[-1].strip()
-                open_application(app_name)
-            elif "system" in command and "info" in command:
-                system_info()
-            elif "weather" in command:
-                speak("Which city do you want the weather for?")
-                city = listen()
-                get_weather(city)
-            elif "note" in command:
-                take_notes()
-            elif "reminder" in command:
-                set_reminder()
-            elif "search" in command:
-                web_search(command)
-            elif "exit" in command or "quit" in command:
-                speak("Goodbye!")
-                break
-            else:
-                response = chat_with_openrouter(command)
-                if response:
-                    speak(response)
-                else:
-                    speak("Sorry, I couldn't understand that.")
 
 if __name__ == "__main__":
-    speak("Hello! I am your assistant.")
-    chat()
+    app.run(debug=True, host="0.0.0.0", port=5000)
