@@ -1,3 +1,4 @@
 .env
 .Venv
 .Venv/
+.gitignore
