@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teeni chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+  <div class='sidebar-overlay'></div>
+  <div class="app">
+    <div class="header">
+      <div class="brand"><i class="fa-solid fa-message"></i> Teeni Chat</div>
+      <div class="userbox">
+        <form action="{{ url_for('profile') }}" method="post" enctype="multipart/form-data"
+          style="display:flex; align-items:center; gap:8px">
+          <img src="{{ avatar_url }}" alt="avatar">
+          <label class="button" style="padding:6px 10px">
+            <i class="fa-solid fa-camera"></i> Change
+            <input type="file" name="avatar" accept="image/*" style="display:none" onchange="this.form.submit()">
+          </label>
+        </form>
+        <a class="button" href="/logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="sidebar">
+        <div class="search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input placeholder="Search…">
+        </div>
+        <div class="rooms">
+          <div class="room"><span>General</span><i class="fa-regular fa-comments"></i></div>
+          <div class="room"><span>Random</span><i class="fa-regular fa-sun"></i></div>
+          <div class="room"><span>Announcements</span><i class="fa-solid fa-bullhorn"></i></div>
+        </div>
+      </div>
+
+      <div class="chat">
+        <div id="messages" class="messages"></div>
+
+        <form id="sendForm" class="inputbar" enctype="multipart/form-data">
+          <div class="field">
+            <i class="fa-regular fa-face-smile"></i>
+            <input id="messageInput" type="text" name="content" placeholder="Type a message…" autocomplete="off">
+          </div>
+          <div class="attach iconbtn glow">
+            <label title="Attach file">
+              <img class="iconimg" src="{{ url_for('static', filename='icons/file.svg') }}" alt="attach">
+              <input id="fileInput" type="file" name="file" style="display:none">
+            </label>
+          </div>
+          <button class="iconbtn glow" type="button" id="recordBtn" title="Record voice">
+            <img class="iconimg" src="{{ url_for('static', filename='icons/mic.svg') }}" alt="mic">
+          </button>
+          <button class="iconbtn glow" id="sendBtn" type="submit" title="Send">
+            <img class="iconimg" src="{{ url_for('static', filename='icons/send.svg') }}" alt="send">
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const me = {{ username| tojson }};
+
+    function fmt(ts) { return new Date(ts.replace(' ', 'T')).toLocaleTimeString() }
+
+    async function loadMessages() {
+      const res = await fetch('/api/messages');
+      const data = await res.json();
+      const box = document.getElementById('messages');
+      box.innerHTML = '';
+      data.forEach(m => {
+        const isMe = m.sender === me;
+        const wrap = document.createElement('div');
+        wrap.className = 'msg ' + (isMe ? 'sent' : 'recv');
+        const avatar = document.createElement('img');
+        avatar.className = 'avatar';
+        avatar.src = isMe ? '{{ avatar_url }}' : '{{ url_for("static", filename="default-avatar.png") }}';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const text = document.createElement('div');
+        text.textContent = m.content || '';
+        bubble.appendChild(text);
+        if (m.file_path) {
+          const a = document.createElement('a');
+          a.href = '/uploads/' + m.file_path;
+          a.textContent = 'Attachment';
+          a.target = '_blank';
+          a.style.display = 'block';
+          bubble.appendChild(a);
+        }
+        if (m.voice_path) {
+          const audio = document.createElement('audio');
+          audio.controls = true;
+          audio.src = '/uploads/' + m.voice_path;
+          bubble.appendChild(audio);
+        }
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = m.sender + ' • ' + (m.timestamp || '');
+        bubble.appendChild(meta);
+        wrap.appendChild(avatar);
+        wrap.appendChild(bubble);
+        box.appendChild(wrap);
+        box.scrollTop = box.scrollHeight;
+      });
+    }
+
+    const form = document.getElementById('sendForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const res = await fetch('/api/messages', { method: 'POST', body: fd });
+      if (res.ok) {
+        document.getElementById('messageInput').value = '';
+        document.getElementById('fileInput').value = '';
+        loadMessages();
+
+        // Sidebar toggle
+        document.getElementById('hamburger').addEventListener('click', () => {
+          document.querySelector('.sidebar').classList.toggle('hidden');
+        });
+
+        // Send button enable/disable
+        const sendBtn = document.getElementById('sendBtn');
+        const msgInput = document.getElementById('messageInput');
+        const fileInput = document.getElementById('fileInput');
+        function updateSendState() {
+          const hasText = (msgInput.value || '').trim().length > 0;
+          const hasFile = fileInput.files && fileInput.files.length > 0;
+          sendBtn.disabled = !(hasText || hasFile);
+        }
+        msgInput.addEventListener('input', updateSendState);
+        fileInput.addEventListener('change', updateSendState);
+        updateSendState();
+
+        // Block empty submits (unless file present)
+        document.getElementById('sendForm').addEventListener('submit', (e) => {
+          const hasText = (msgInput.value || '').trim().length > 0;
+          const hasFile = fileInput.files && fileInput.files.length > 0;
+          if (!(hasText || hasFile)) {
+            e.preventDefault();
+            return false;
+          }
+        });
+
+
+      }
+    });
+
+    // Voice recording (simple)
+    let mediaRecorder, chunks = [];
+    const btn = document.getElementById('recordBtn');
+    btn.addEventListener('click', async () => {
+      if (!mediaRecorder) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.ondataavailable = e => chunks.push(e.data);
+          mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            chunks = [];
+            const fd = new FormData();
+            fd.append('voice', blob, 'voice.webm');
+            fd.append('content', document.getElementById('messageInput').value || '');
+            const res = await fetch('/api/messages', { method: 'POST', body: fd });
+            if (res.ok) loadMessages();
+
+            // Sidebar toggle
+            document.getElementById('hamburger').addEventListener('click', () => {
+              document.querySelector('.sidebar').classList.toggle('hidden');
+            });
+
+            // Send button enable/disable
+            const sendBtn = document.getElementById('sendBtn');
+            const msgInput = document.getElementById('messageInput');
+            const fileInput = document.getElementById('fileInput');
+            function updateSendState() {
+              const hasText = (msgInput.value || '').trim().length > 0;
+              const hasFile = fileInput.files && fileInput.files.length > 0;
+              sendBtn.disabled = !(hasText || hasFile);
+            }
+            msgInput.addEventListener('input', updateSendState);
+            fileInput.addEventListener('change', updateSendState);
+            updateSendState();
+
+            // Block empty submits (unless file present)
+            document.getElementById('sendForm').addEventListener('submit', (e) => {
+              const hasText = (msgInput.value || '').trim().length > 0;
+              const hasFile = fileInput.files && fileInput.files.length > 0;
+              if (!(hasText || hasFile)) {
+                e.preventDefault();
+                return false;
+              }
+            });
+
+
+          };
+          mediaRecorder.start();
+          btn.innerHTML = '<i class="fa-solid fa-stop"></i>';
+        } catch (e) {
+          alert('Mic permission denied');
+        }
+      } else {
+        mediaRecorder.stop();
+        mediaRecorder = null;
+        btn.innerHTML = '<img class="iconimg" src="{{ url_for('static', filename='icons / mic.svg') }}" alt="mic">';
+      }
+    });
+
+    loadMessages();
+
+    // Sidebar toggle
+    document.getElementById('hamburger').addEventListener('click', () => {
+      document.querySelector('.sidebar').classList.toggle('hidden');
+    });
+
+    // Send button enable/disable
+    const sendBtn = document.getElementById('sendBtn');
+    const msgInput = document.getElementById('messageInput');
+    const fileInput = document.getElementById('fileInput');
+    function updateSendState() {
+      const hasText = (msgInput.value || '').trim().length > 0;
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      sendBtn.disabled = !(hasText || hasFile);
+    }
+    msgInput.addEventListener('input', updateSendState);
+    fileInput.addEventListener('change', updateSendState);
+    updateSendState();
+
+    // Block empty submits (unless file present)
+    document.getElementById('sendForm').addEventListener('submit', (e) => {
+      const hasText = (msgInput.value || '').trim().length > 0;
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      if (!(hasText || hasFile)) {
+        e.preventDefault();
+        return false;
+      }
+    });
+
+
+    setInterval(loadMessages, 3000);
+
+    // Mobile sidebar overlay logic
+    const overlay = document.querySelector('.sidebar-overlay');
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('show');
+      overlay.classList.toggle('active');
+    });
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('show');
+      overlay.classList.remove('active');
+    });
+  </script>
+  <button id="scrollBtn" class="scroll-btn"><i class="fas fa-arrow-down"></i></button>
+</body>
+
+</html>
