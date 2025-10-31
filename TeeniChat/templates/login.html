@@ -1,32 +1,38 @@
-
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login • Chatapp</title>
+  <title>Login • TeeniChat</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
+
 <body>
   <div class="app" style="align-items:center; justify-content:center;">
     <div class="chat" style="max-width:480px; width:100%;">
       <div class="header">
-        <div class="brand"><i class="fa-solid fa-message"></i> Chatapp</div>
+        <div class="brand"><i class="fa-solid fa-message"></i> TeeniChat</div>
       </div>
       <div style="padding:20px; display:flex; flex-direction:column; gap:12px">
-        {% if error %}<div style="background:#3f1f1f; border:1px solid #5d2a2a; padding:10px; border-radius:12px">{{ error }}</div>{% endif %}
+        {% if error %}<div style="background:#3f1f1f; border:1px solid #5d2a2a; padding:10px; border-radius:12px">{{
+          error }}</div>{% endif %}
         <form method="post" style="display:flex; flex-direction:column; gap:12px">
-          <input name="username" placeholder="Username" required style="padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0d1424; color:#e5e7eb">
-          <input name="password" type="password" placeholder="Password" required style="padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0d1424; color:#e5e7eb">
+          <input name="username" placeholder="Username" required
+            style="padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0d1424; color:#e5e7eb">
+          <input name="password" type="password" placeholder="Password" required
+            style="padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0d1424; color:#e5e7eb">
           <button class="button" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
         </form>
-        <div class="footer-note">No account? <a href="{{ url_for('signup') }}" class="button" style="padding:6px 10px">Create one</a></div>
+        <div class="footer-note">No account? <a href="{{ url_for('signup') }}" class="button"
+            style="padding:6px 10px">Create one</a></div>
       </div>
     </div>
   </div>
 </body>
+
 </html>
