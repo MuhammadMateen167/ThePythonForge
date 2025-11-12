@@ -1,0 +1,6 @@
+Flask>=2.0
+requests>=2.25
+pyttsx3>=2.90
+SpeechRecognition>=3.8.1
+pyaudio; platform_system=='Windows' or platform_system=='Linux'
+PyQt5>=5.15; platform_system=='Windows' or platform_system=='Linux' or platform_system=='Darwin'

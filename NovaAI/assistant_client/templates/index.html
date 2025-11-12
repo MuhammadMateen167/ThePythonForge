@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Nova AI Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+  <div class="app" id="app">
+    <header>
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      <h1>Nova AI Assistant</h1>
+    </header>
+
+    <main>
+      <div id="chat"></div>
+      <form id="promptForm" class="prompt" onsubmit="return false;">
+        <input id="prompt" placeholder="Message Nova..." autocomplete="off" />
+        <button id="send" title="Send"><img src="{{ url_for('static', filename='assets/send.svg') }}"
+            alt="Download Icon"></button>
+        <button id="voiceBtn" title="Voice input"><img src="{{ url_for('static', filename='assets/mic.svg') }}"
+            alt="Mic Icon"></button>
+        <button id="downloadBtn" title="Download file"><img
+            src="{{ url_for('static', filename='assets/download.svg') }}" alt="Download Icon"></button>
+      </form>
+    </main>
+
+    <footer>
+      <small>Offline capable • Voice AI • Responsive Interface</small>
+    </footer>
+  </div>
+
+  <script>
+    const chat = document.getElementById('chat');
+    const promptInput = document.getElementById('prompt');
+    const synth = window.speechSynthesis;
+    const themeToggle = document.getElementById('themeToggle');
+    const app = document.getElementById('app');
+
+    // Parse markdown-ish text
+    function parseMarkdown(text) {
+      return text
+        .replace(/\*(.*?)\*/g, "<strong>$1</strong>")
+        .replace(/_(.*?)_/g, "<em>$1</em>")
+        .replace(/`(.*?)`/g, "<code>$1</code>");
+    }
+
+    function appendMessage(cls, text) {
+      const msg = document.createElement('div');
+      msg.className = 'msg ' + cls;
+      msg.innerHTML = parseMarkdown(text);
+      chat.appendChild(msg);
+      msg.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function sendPrompt(prompt) {
+      appendMessage('user', prompt);
+      try {
+        const r = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        const j = await r.json();
+        const reply = j.reply || JSON.stringify(j);
+        appendMessage('bot', reply);
+        speak(reply);
+      } catch (e) {
+        appendMessage('bot', 'Error: ' + e);
+      }
+    }
+
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      utter.rate = 1;
+      synth.speak(utter);
+    }
+
+    document.getElementById('send').onclick = () => {
+      const p = promptInput.value.trim();
+      if (!p) return;
+      sendPrompt(p);
+      promptInput.value = '';
+    };
+
+    document.getElementById('voiceBtn').onclick = () => {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) return appendMessage('system', 'Voice not supported.');
+      const recog = new SR();
+      recog.lang = 'en-US';
+      recog.interimResults = false;
+      recog.maxAlternatives = 1;
+
+      appendMessage('system', 'Listening... 🎤');
+      recog.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        appendMessage('user', text);
+        sendPrompt(text);
+      };
+      recog.onerror = (e) => appendMessage('system', 'Voice error: ' + e.error);
+      recog.onend = () => appendMessage('system', 'Voice input ended.');
+      recog.start();
+    };
+
+    document.getElementById('downloadBtn').onclick = async () => {
+      const url = prompt('Enter file or video URL:');
+      if (!url) return;
+      appendMessage('system', 'Downloading: ' + url);
+      try {
+        const r = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const j = await r.json();
+        appendMessage('bot', j.result || j.error || JSON.stringify(j));
+        if (j.result) speak(j.result);
+      } catch (e) {
+        appendMessage('bot', 'Error: ' + e);
+      }
+    };
+
+    themeToggle.onclick = () => {
+      const light = app.getAttribute('data-theme') === 'light';
+      if (light) {
+        app.removeAttribute('data-theme');
+        themeToggle.textContent = '🌙';
+      } else {
+        app.setAttribute('data-theme', 'light');
+        themeToggle.textContent = '☀️';
+      }
+    };
+  </script>
+</body>
+
+</html>

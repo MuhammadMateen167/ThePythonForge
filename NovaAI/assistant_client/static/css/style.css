@@ -1,0 +1,227 @@
+:root {
+    --bg: #0e0f12;
+    --fg: #e6e6e6;
+    --accent: #008cff;
+    --bot-bg: #1a1c20;
+    --user-bg: #008cff;
+    --system-fg: #a0a0a0;
+    --radius: 1.2rem;
+}
+
+[data-theme='light'] {
+    --bg: #f9f9f9;
+    --fg: #222;
+    --accent: #0066cc;
+    --bot-bg: #ececec;
+    --user-bg: #0078d4;
+    --system-fg: #555;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    transition: background 0.4s, color 0.4s;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem clamp(1rem, 4vw, 2rem);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+header h1 {
+    font-size: clamp(1.1rem, 2vw, 1.4rem);
+    font-weight: 500;
+    color: var(--accent);
+}
+
+.theme-toggle {
+    cursor: pointer;
+    font-size: 1.4rem;
+    background: none;
+    border: none;
+    color: var(--fg);
+    transition: transform 0.2s, color 0.2s;
+}
+
+.theme-toggle:hover {
+    transform: rotate(15deg);
+    color: var(--accent);
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: clamp(1rem, 3vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    scroll-behavior: smooth;
+}
+
+.msg {
+    max-width: 80%;
+    padding: clamp(0.7rem, 2vw, 1rem) clamp(1rem, 3vw, 1.4rem);
+    border-radius: var(--radius);
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    animation: fadeIn 0.25s ease;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+}
+
+.msg.user {
+    align-self: flex-end;
+    background: var(--user-bg);
+    color: white;
+    border-bottom-right-radius: 0.4rem;
+}
+
+.msg.bot {
+    align-self: flex-start;
+    background: var(--bot-bg);
+    border-bottom-left-radius: 0.4rem;
+}
+
+.msg.system {
+    align-self: center;
+    background: transparent;
+    color: var(--system-fg);
+    font-style: italic;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Markdown formatting */
+.msg strong {
+    font-weight: 600;
+}
+
+.msg em {
+    font-style: italic;
+}
+
+.msg code {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 0.2em 0.4em;
+    font-family: monospace;
+}
+
+form.prompt {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    padding: clamp(0.7rem, 2vw, 1rem);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 0.5rem;
+    transition: background 0.3s;
+    z-index: 10;
+}
+
+form.prompt input {
+    flex: 1;
+    max-width: 900px;
+    padding: clamp(0.7rem, 2vw, 0.9rem) clamp(1rem, 3vw, 1.3rem);
+    border: 1px solid #333;
+    border-radius: 2rem;
+    background: var(--bot-bg);
+    color: var(--fg);
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    outline: none;
+    transition: border 0.2s;
+}
+
+form.prompt input:focus {
+    border-color: var(--accent);
+}
+
+.prompt button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prompt button img {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.2s ease;
+}
+
+.prompt button:hover img {
+    transform: scale(1.1);
+}
+
+footer {
+    text-align: center;
+    padding: 0.6rem;
+    color: var(--system-fg);
+    font-size: clamp(0.7rem, 1.5vw, 0.8rem);
+}
+
+/* Mobile tweaks */
+@media (max-width: 600px) {
+    .msg {
+        max-width: 90%;
+    }
+
+    header h1 {
+        font-size: 1rem;
+    }
+
+    .theme-toggle {
+        font-size: 1.2rem;
+    }
+}
