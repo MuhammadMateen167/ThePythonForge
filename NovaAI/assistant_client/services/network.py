@@ -52,7 +52,7 @@ def send_to_cloud(prompt: str):
         raise ConnectionError("[Offline] No backend server set.")
 
     try:
-        resp = requests.post(f"{BACKEND_URL}/api/chat", json={"message": prompt}, timeout=10)
+        resp = requests.post(f"{BACKEND_URL}/chat", json={"message": prompt}, timeout=10)
         if resp.ok:
             data = resp.json()
             return data.get("reply", "(No reply from server)")
