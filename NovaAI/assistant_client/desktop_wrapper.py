@@ -1,19 +1,36 @@
-# cli_wrapper.py
 import os
 import sys
 import time
+import json
 import subprocess
 import speech_recognition as sr
 from services.tts_engine import speak
-from services.network import is_online, send_to_cloud
+from services.network import is_online, send_to_cloud, set_backend_url
 from routes.offline import handle
-from config import CLOUD_SERVER_URL
 
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 TRIGGER = "hey nova"
 SERVER_START_DELAY = 2
 
-server_url = CLOUD_SERVER_URL
-server_online = False  # Track if cloud backend is reachable
+
+# ---------------------------
+# Config helpers
+# ---------------------------
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {"CLOUD_SERVER_URL": "http://127.0.0.1:8000"}
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_config(data):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+config = load_config()
+server_url = config.get("CLOUD_SERVER_URL", "http://127.0.0.1:8000")
+server_online = False
 
 
 # ---------------------------
@@ -24,9 +41,10 @@ def get_backend_url():
     global server_url, server_online
 
     print(f"[INFO] Trying backend server from config: {server_url}")
-    if is_online():
+    if is_online(server_url):
         server_online = True
         print(f"[INFO] Server reachable at {server_url}")
+        set_backend_url(server_url)
         return
 
     # Server unreachable; prompt user
@@ -36,18 +54,22 @@ def get_backend_url():
     if not user_input:
         server_online = False
         print("[INFO] Running in offline mode only.")
+        set_backend_url(None)
         return
 
-    if not user_input.startswith("https"):
-        user_input = "https://" + user_input
+    if not user_input.startswith("http"):
+        user_input = "http://" + user_input
 
-    server_url = user_input
-    if is_online():
+    if is_online(user_input):
         server_online = True
-        print(f"[INFO] Server reachable at {server_url}")
+        print(f"[INFO] Server reachable at {user_input}")
+        server_url = user_input
+        save_config({"CLOUD_SERVER_URL": user_input})
+        set_backend_url(user_input)
     else:
         server_online = False
         print("[WARN] Could not reach server. Running offline.")
+        set_backend_url(None)
 
 
 # ---------------------------
